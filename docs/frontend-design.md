@@ -7,6 +7,8 @@ The frontend should be a simple, readable React chat interface for learning how 
 The first version should let a user:
 
 - view a chat screen immediately after opening the app
+- view and manage their existing conversations in a conversation list
+- create a new conversation and switch between conversations
 - type a message
 - send the message to the backend
 - see the assistant response stream into the page
@@ -48,23 +50,28 @@ The first screen should be a focused chat workspace.
 Suggested layout:
 
 ```text
-+--------------------------------------------+
-| AI Chat                                    |
-| Local learning app                         |
-+--------------------------------------------+
-|                                            |
-|  Assistant message                         |
-|                           User message     |
-|  Assistant streaming reply...              |
-|                                            |
-+--------------------------------------------+
-| [ message input                         ]  |
-|                                  [Send]    |
-+--------------------------------------------+
++------------------+-------------------------+
+| Conversations    | AI Chat                 |
+| [+ New chat]     | Local learning app      |
+|                  +-------------------------+
+| > Project idea   |                         |
+|   Recipe helper  |  Assistant message      |
+|   Untitled       |              User msg   |
+|                  |  Assistant reply...     |
+|                  |                         |
+|                  +-------------------------+
+|                  | [ message input    ]   |
+|                  |                 [Send]  |
++------------------+-------------------------+
 ```
 
 The page should have:
 
+- a conversation sidebar with the conversation list and a clear new-chat action
+- a loading state while conversations are being fetched
+- an empty state when there are no saved conversations
+- a selected state for the active conversation
+- a delete action for each conversation, with a safe confirmation or undo pattern
 - a small header with the app name and connection/status area
 - a scrollable message list
 - an empty state when there are no messages
@@ -83,6 +90,8 @@ frontend/src/
     chat.ts
   components/
     ChatPage.tsx
+    ConversationSidebar.tsx
+    ConversationItem.tsx
     ConversationHeader.tsx
     MessageList.tsx
     MessageBubble.tsx
@@ -92,6 +101,7 @@ frontend/src/
     useChatStream.ts
   types/
     chat.ts
+    conversation.ts
   styles/
     globals.css
 ```
@@ -113,6 +123,25 @@ Responsibility:
 - pass message state and callbacks down to child components
 
 It should not contain low-level streaming code.
+
+### `ConversationSidebar.tsx`
+
+Responsibility:
+
+- render the conversation list beside the active chat
+- show loading and empty states
+- highlight the active conversation
+- expose new-conversation, select-conversation, and delete-conversation actions
+
+The sidebar should remain a presentational component. Conversation fetching and mutations should live in a small conversation hook or API client.
+
+### `ConversationItem.tsx`
+
+Responsibility:
+
+- render one conversation title and its updated time when useful
+- expose a clearly scoped delete action
+- indicate which conversation is currently active
 
 ### `ConversationHeader.tsx`
 
@@ -161,6 +190,7 @@ Responsibility:
 - store `error`
 - expose a `sendMessage` function
 - append streamed assistant text into the active assistant message
+- reset or load message state when the active conversation changes
 
 This hook is the most important learning piece in the frontend. It should stay readable even if it is a little verbose.
 
@@ -173,6 +203,17 @@ Responsibility:
 - expose a small function for streaming chat responses
 
 The first streaming implementation can use `fetch` and `ReadableStream`.
+
+### `api/conversations.ts`
+
+Responsibility:
+
+- list conversations
+- create a conversation
+- delete a conversation
+- load messages for a selected conversation
+
+Keep these functions small and typed so the sidebar and chat hook do not need to know the fetch details.
 
 ## Frontend Types
 
@@ -190,6 +231,17 @@ export type ChatMessage = {
 };
 
 export type ChatStatus = "idle" | "streaming" | "error";
+```
+
+Conversation types should be kept separately in `frontend/src/types/conversation.ts`:
+
+```ts
+export type Conversation = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
 ```
 
 These types may later be aligned more closely with backend response schemas.
@@ -226,9 +278,15 @@ GET  /api/conversations
 GET  /api/conversations/{conversation_id}/messages
 ```
 
-The first frontend milestone only needs `POST /api/chat/stream`.
+The frontend should use these endpoints as follows:
 
-Conversation loading can come after the core streaming loop is working.
+- load `GET /api/conversations` when the page opens and after conversation mutations
+- use `POST /api/conversations` for an explicit new conversation
+- use `GET /api/conversations/{conversation_id}/messages` when switching conversations
+- use `DELETE /api/conversations/{conversation_id}` after the user confirms deletion
+- include the active conversation ID in `POST /api/chat/stream`
+
+The chat stream remains the core interaction, but conversation loading should be implemented alongside the sidebar so the active conversation is always clear.
 
 ## Styling Direction
 
@@ -248,7 +306,7 @@ Avoid:
 - decorative landing page sections
 - large hero content
 - heavy animations
-- complex sidebars in the first version
+- nested or overly complex sidebar navigation
 - one-color novelty themes
 
 CSS should start in `frontend/src/styles/globals.css`. If the file grows too large later, component-level CSS files can be introduced.
@@ -265,7 +323,10 @@ Build the frontend in small steps.
 6. Add `useChatStream.ts`.
 7. Connect the UI to the backend streaming endpoint.
 8. Add loading and error states.
-9. Add conversation loading after streaming works.
+9. Add the conversation API client and conversation types.
+10. Add the conversation sidebar with loading, empty, selected, and delete states.
+11. Load messages when the user switches conversations.
+12. Add new-conversation and delete-conversation behavior.
 
 Each step should leave the app runnable.
 
@@ -274,6 +335,8 @@ Each step should leave the app runnable.
 The first frontend implementation should include:
 
 - `ChatPage`
+- `ConversationSidebar`
+- `ConversationItem`
 - `ConversationHeader`
 - `MessageList`
 - `MessageBubble`
@@ -281,6 +344,7 @@ The first frontend implementation should include:
 - `EmptyState`
 - `useChatStream`
 - `api/chat`
+- `api/conversations`
 - basic responsive CSS
 
 It should not include:
@@ -291,7 +355,6 @@ It should not include:
 - file upload
 - Markdown rendering
 - syntax highlighting
-- conversation sidebar
 - global state library
 - UI component framework
 
