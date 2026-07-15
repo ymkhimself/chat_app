@@ -34,8 +34,8 @@ export async function streamChat(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const isEventStream = response.headers.get("content-type")?.includes("text/event-stream") ?? false;
+  let returnedConversationId: string | undefined = response.headers.get("x-conversation-id") ?? undefined;
   let buffer = "";
-  let returnedConversationId: string | undefined;
 
   while (true) {
     const { done, value } = await reader.read();

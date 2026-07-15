@@ -14,7 +14,7 @@ router = APIRouter(prefix="/conversations", tags=["messages"])
 @router.get("/{conversation_id}/messages", response_model=list[MessageRead])
 def list_messages(conversation_id: str, db: Session = Depends(get_db)):
     conversation = db.get(Conversation, conversation_id)
-    if conversation is None:
+    if conversation is None or conversation.deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found",

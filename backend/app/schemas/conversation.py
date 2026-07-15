@@ -7,6 +7,10 @@ class ConversationCreate(BaseModel):
     title: str = Field(default="New conversation", max_length=200)
 
 
+class ConversationUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
+
 class ConversationRead(BaseModel):
     id: str
     title: str
@@ -14,4 +18,3 @@ class ConversationRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
-

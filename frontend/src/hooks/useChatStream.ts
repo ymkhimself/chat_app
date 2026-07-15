@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { streamChat } from "../api/chat";
+import { createConversation, listMessages } from "../api/conversations";
 import type { ChatMessage, ChatStatus } from "../types/chat";
 
 const makeId = () => crypto.randomUUID();
@@ -11,10 +12,34 @@ export function useChatStream() {
   const [error, setError] = useState<string>();
   const abortRef = useRef<AbortController | undefined>(undefined);
 
+  const selectConversation = useCallback(async (id?: string) => {
+    if (status === "streaming") return;
+    setConversationId(id);
+    setError(undefined);
+    if (!id) {
+      setMessages([]);
+      return;
+    }
+    setMessages([]);
+    try {
+      setMessages(await listMessages(id));
+      setStatus("idle");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to load messages.");
+      setStatus("error");
+    }
+  }, [status]);
+
   const sendMessage = useCallback(async (content: string) => {
     const text = content.trim();
     if (!text || status === "streaming") return;
 
+    let activeConversationId = conversationId;
+    if (!activeConversationId) {
+      const conversation = await createConversation();
+      activeConversationId = conversation.id;
+      setConversationId(conversation.id);
+    }
     const assistantId = makeId();
     setMessages((current) => [
       ...current,
@@ -28,7 +53,7 @@ export function useChatStream() {
 
     try {
       const result = await streamChat(text, {
-        conversationId,
+        conversationId: activeConversationId,
         signal: controller.signal,
         onChunk: (chunk) => {
           setMessages((current) =>
@@ -52,5 +77,5 @@ export function useChatStream() {
   }, [conversationId, status]);
 
   const stopStreaming = useCallback(() => abortRef.current?.abort(), []);
-  return { messages, status, error, sendMessage, stopStreaming };
+  return { messages, conversationId, status, error, sendMessage, stopStreaming, selectConversation };
 }

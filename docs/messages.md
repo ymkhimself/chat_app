@@ -34,6 +34,17 @@ response_id     string, optional
 created_at      datetime, required
 ```
 
+The `conversations` table also stores model-facing context state:
+
+```text
+context_summary    string, optional, bounded summary of older messages
+summary_updated_at datetime, optional, last summary refresh time
+```
+
+These fields do not replace message history. They let the chat service keep
+the complete transcript for display and audit while sending a bounded context
+to the model.
+
 Role values for the first version:
 
 ```text
@@ -52,12 +63,17 @@ One conversation has many messages:
 Conversation 1 -> N Message
 ```
 
-When a conversation is deleted, its messages should also be deleted.
+When a conversation is deleted, it should be soft-deleted by setting
+`conversations.deleted_at`. The conversation and its messages remain in the
+database for recovery and audit purposes, but normal list, message, and chat
+queries must exclude deleted conversations.
 
-For SQLAlchemy, this can be expressed with a relationship and cascade delete:
+The relationship can still use a cascade for a future hard-delete operation,
+but the normal delete API must only update `deleted_at`:
 
 ```text
-Conversation.messages -> relationship(..., cascade="all, delete-orphan")
+Conversation.deleted_at -> nullable datetime
+DELETE /api/conversations/{id} -> UPDATE conversations SET deleted_at = ...
 Message.conversation_id -> ForeignKey("conversations.id")
 ```
 
@@ -159,6 +175,8 @@ Client sends message
   -> validate conversation exists
   -> insert user message
   -> load recent conversation messages
+  -> if older messages leave the context window, summarize them and save the summary
+  -> send the saved summary plus recent messages to the model
   -> call LLM or fake streaming service
   -> stream assistant chunks to client
   -> insert final assistant message
@@ -179,8 +197,7 @@ Also add:
 Message SQLAlchemy model
 Message Pydantic read schema
 Conversation.messages relationship
-cascade delete from conversation to messages
+soft delete through `deleted_at`
 ```
 
 Do not add LLM calls, streaming, frontend changes, or message creation endpoints in this step.
-

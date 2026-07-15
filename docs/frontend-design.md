@@ -268,6 +268,41 @@ Important behavior:
 - If the request fails, the user message should remain visible.
 - The error should be shown without crashing the page.
 
+## Conversation Context Management
+
+The database keeps the complete message history, but the backend should not
+send an unbounded history to the model on every request. The first context
+management version uses a rolling summary:
+
+```text
+complete messages in SQLite
+  -> keep the newest messages within the message and character budgets
+  -> summarize older messages when they leave the active window
+  -> store the summary on the conversation
+  -> send summary + recent messages to the model
+```
+
+The summary is model-facing context, not a replacement for the original
+messages. The frontend can continue loading and displaying the complete
+conversation history.
+
+Backend defaults should be configurable through environment variables:
+
+```text
+CHAT_MAX_HISTORY_MESSAGES=20
+CHAT_CONTEXT_MAX_CHARS=24000
+CHAT_SUMMARY_MAX_CHARS=4000
+```
+
+Summary behavior:
+
+- create a summary only when older messages fall outside the active context window
+- include the previous summary when creating the next summary
+- preserve user goals, decisions, constraints, technical details, and unresolved questions
+- keep the summary bounded in length
+- reserve context budget for the summary before selecting recent messages
+- if summarization fails, continue with the recent-message context and log the failure
+
 ## API Assumptions
 
 The frontend should expect the backend to provide:
@@ -327,6 +362,8 @@ Build the frontend in small steps.
 10. Add the conversation sidebar with loading, empty, selected, and delete states.
 11. Load messages when the user switches conversations.
 12. Add new-conversation and delete-conversation behavior.
+13. Add context message limits and configurable character budgets.
+14. Add conversation-level rolling summaries for older messages.
 
 Each step should leave the app runnable.
 

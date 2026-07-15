@@ -22,6 +22,11 @@ class Conversation(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    context_summary: Mapped[str | None] = mapped_column(String(4000), nullable=True)
+    summary_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation",
         cascade="all, delete-orphan",
